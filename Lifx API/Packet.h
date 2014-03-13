@@ -146,6 +146,15 @@ namespace lifx {
 			}
 			return stream.str();
 		}
+
+		void FromString(const std::string& str) {
+			unsigned fakeAddr[6];
+			sscanf_s(str.c_str(), "%x::%x::%x::%x::%x::%x",
+				&fakeAddr[0], &fakeAddr[1], &fakeAddr[2], &fakeAddr[3], &fakeAddr[4], &fakeAddr[5]);
+			for (unsigned i = 0; i < 6; ++i) {
+				address[i] = ( uint8_t) fakeAddr[i];
+			}
+		}
 	};
 
 	class Packet

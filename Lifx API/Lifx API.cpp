@@ -7,6 +7,7 @@
 #include <memory>
 #include <list>
 #include <map>
+#include <fstream>
 #include "Socket.h"
 #include "Packet.h"
 #include "Color.h"
@@ -18,11 +19,43 @@ public:
 	Manager(const std::string& broadcastIP ){
 		brightness = 0;
 		socket = std::shared_ptr<Socket>(Socket::CreateBroadcast(broadcastIP));
+		startTime = socket->GetTicks();
+		timeout = 0;
+	}
+
+	void ReadBulbs(const std::string& fname) {
+		std::ifstream file(fname);
+		while (file) {
+			std::string name;
+			std::string mac;
+			file>> name;
+			if (file) {
+				file >> mac;
+				MacAddress addr;
+				addr.FromString(mac);
+				bulbs[name] = addr;
+			}
+		}
+
+		file.close();
+	}
+
+	void WriteBulbs(const std::string& fname) {
+		std::ofstream file(fname);
+		for (const auto& it: bulbs) {
+			if (it.first.length() > 0 && !it.second.IsNull()) {
+				file << it.first << " " << it.second.ToString() << "\n";
+			}
+		}
+	}
+
+	void SetTimeout(unsigned to) {
+		timeout = to;
 	}
 
 	void Initialize() {
 		bulbs.clear();
-		lastStatusCheck = socket->GetTicks();
+		startTime = socket->GetTicks();
 		ListDevices();
 	}
 
@@ -31,12 +64,13 @@ public:
 		this->brightness = brightness;
 	}
 
-	void Update() {
+	bool Update() {
 		ReadPacket();
-		if (lastStatusCheck + 10000 < socket->GetTicks()) {
-			lastStatusCheck = socket->GetTicks();
-			GetLightState();
+		if (timeout > 0 && startTime + timeout < socket->GetTicks()) {
+			return false;
 		}
+
+		return true;
 	}
 
 	void ListDevices() {
@@ -116,6 +150,7 @@ public:
 protected:
 	Color::rgb color;
 	float brightness;
+	unsigned timeout;
 
 	void ReadPacket() {
 		Packet packet;
@@ -149,28 +184,41 @@ protected:
 			if (brightness > 0) {
 				SetColor(color, brightness);
 			}
+			WriteBulbs("cache");
 		} else if (packet.GetType() == PacketType::LightStatus) {
 			bulbs[packet.GetLightStatus().bulb_label] = packet.GetSiteMac();
 			if (brightness > 0) {
 				SetColor(color, brightness);
 			}
+			WriteBulbs("cache");
 		}
 	}
 
 	std::shared_ptr<Socket> socket;
 	std::map<std::string, MacAddress> bulbs;
-	unsigned lastStatusCheck;
+	unsigned startTime;
 };
 
-int _tmain(int argc, _TCHAR* argv[])
+int main(int argc, const char* argv[])
 {
 	Manager manager("192.168.66.255");
-	manager.SetDefaultColor(Color::rgb(1,0,0), 0.2f);
 	manager.Initialize();
+	manager.ReadBulbs("cache");
 
-	while (true)
-	{
-		manager.Update();
+	if (argc > 4) {
+		// set color and quit
+		float r,g,b,brightness;
+		sscanf_s(argv[1], "%f", &r);
+		sscanf_s(argv[2], "%f", &g);
+		sscanf_s(argv[3], "%f", &b);
+		sscanf_s(argv[4], "%f", &brightness);
+		manager.SetColor(r,g,b,brightness);
+
+		std::cout << r<< " " << g<< " " << b << " " << brightness << "\n";
+	} else {
+		// try to update cache
+		manager.SetTimeout(2000);
+		while (manager.Update());
 	}
 
 	return 0;
