@@ -31,6 +31,42 @@ namespace lifx {
 		struct BulbLabel {
 			char label[32]; // UTF-8 encoded string
 		};
+
+		struct LightStatus {
+			uint16_t hue;          // LE
+			uint16_t saturation;   // LE
+			uint16_t brightness;   // LE
+			uint16_t kelvin;       // LE
+			uint16_t dim;          // LE?
+			uint16_t power;
+			char bulb_label[32]; // UTF-8 encoded string
+			uint64_t tags;
+		};
+
+		struct LightColor {
+			void Initialize() {
+				memset(this, 0, sizeof(*this));
+			}
+#if 0
+			uint8_t stream;        // Unknown, potential "streaming" mode toggle? Set to
+			// 0x00 for now.
+			uint8_t reserved1;
+			uint8_t hue;         // LE NOTE: Wraps around at 0xff 0xff back to 0x00 0x00
+			// which is a primary red colour.
+			uint8_t reserved2;
+			uint8_t saturation;  // LE
+			uint8_t reserved3;
+			uint8_t brightness;  // LE
+			uint8_t reserved4;
+			uint8_t kelvin;      // LE i.e. colour temperature (whites wheel in apps)
+			uint32_t fade_time;   // LE Length of fade action, in seconds
+#else
+			uint16_t blue;
+			uint16_t green;
+			uint16_t red;
+			uint16_t white;
+#endif
+		};
 	}
 
 	namespace Protocol {
@@ -45,6 +81,9 @@ namespace lifx {
 		const uint16_t WifiInfo = 0x11;
 		const uint16_t GetBulbLabel = 0x17;
 		const uint16_t BulbLabel = 0x19;
+		const uint16_t GetLightState = 0x65;
+		const uint16_t SetLightColor = 0x6a;
+		const uint16_t LightStatus = 0x6b;
 	}
 
 	struct MacAddress {
@@ -95,6 +134,8 @@ namespace lifx {
 			Payload::PanGatewayState panGatewayState;
 			Payload::WifiInfo wifiInfo;
 			Payload::BulbLabel bulbLabel;
+			Payload::LightStatus lightStatus;
+			Payload::LightColor lightColor;
 		};
 
 		uint16_t size;              // LE
@@ -130,9 +171,6 @@ namespace lifx {
 			target_mac_address = MacAddress();
 			site = MacAddress();
 			size = sizeof(Packet) - sizeof(payload_t);
-			if (type == PacketType::PanGatewayState) {
-				size += sizeof(Payload::PanGatewayState);
-			}
 		}
 
 		uint16_t GetType() const {
@@ -149,10 +187,21 @@ namespace lifx {
 			return payload.bulbLabel;
 		}
 
+		Payload::LightStatus GetLightStatus() const {
+			assert(GetType() == PacketType::LightStatus);
+			return payload.lightStatus;
+		}
+
+		void SetLightColor(const Payload::LightColor& lightColor) {
+			Initialize(PacketType::SetLightColor);
+			size += sizeof(Payload::LightColor);
+			payload.lightColor = lightColor;
+		}
+
 		std::string ToString() const {
 			std::stringstream ret;
 			ret << "size: " << size;
-			ret << ", packet type: " << packet_type;
+			ret << ", packet type: " << "0x" << std::hex << packet_type << std::dec;
 			if (packet_type == PacketType::Invalid) {
 				ret << " (invalid packet)";
 			} else		if (packet_type == PacketType::GetPanGateway) {
@@ -169,10 +218,24 @@ namespace lifx {
 				ret << " (GetBulbLabel)";
 			} else if (packet_type == PacketType::BulbLabel) {
 				ret << " (BulbLabel), label: " << payload.bulbLabel.label;
+			} else if (packet_type == PacketType::LightStatus) {
+				ret << " (LightStatus), label: " << payload.lightStatus.bulb_label;
+				ret << std::hex;
+				ret << ", hue: 0x" << payload.lightStatus.hue;
+				ret << ", sat: 0x" << payload.lightStatus.saturation;
+				ret << ", brightness: 0x" << payload.lightStatus.brightness;
+				ret << ", kelvin: 0x" << payload.lightStatus.kelvin;
+				ret << ", dim: 0x" << payload.lightStatus.dim;
+				ret << ", power: 0x" << payload.lightStatus.power;
+			} else if (packet_type == PacketType::SetLightColor) {
+				ret << " (SetLightColor)";
+			} else if (packet_type == PacketType::GetLightState) {
+				ret << " (getLightState)";
 			} else {
 				ret << " (unknown)";
 			}
 
+#if 0
 			if (!target_mac_address.IsNull()) {
 				ret << ", target mac: " << target_mac_address.ToString();
 			}
@@ -180,6 +243,7 @@ namespace lifx {
 			if (!site.IsNull()) {
 				ret << ", site mac: " << site.ToString();
 			}
+#endif
 
 			return ret.str();
 		}

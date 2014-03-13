@@ -81,6 +81,7 @@
     <Text Include="ReadMe.txt" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="Color.h" />
     <ClInclude Include="Packet.h" />
     <ClInclude Include="Socket.h" />
     <ClInclude Include="stdafx.h" />
