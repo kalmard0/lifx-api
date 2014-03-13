@@ -77,6 +77,12 @@ namespace lifx {
 #endif
 			uint32_t fade_time;   // LE Length of fade action, in seconds
 		};
+
+		struct SetDim {
+			uint8_t reserved;
+			uint8_t brightness; // LE
+			uint32_t duration;  // in seconds
+		};
 	}
 
 	namespace Protocol {
@@ -93,6 +99,7 @@ namespace lifx {
 		const uint16_t BulbLabel = 0x19;
 		const uint16_t GetLightState = 0x65;
 		const uint16_t SetLightColorHSL = 0x66;
+		const uint16_t SetDim = 0x68;
 		const uint16_t SetLightColorRGBW = 0x6a;
 		const uint16_t LightStatus = 0x6b;
 	}
@@ -148,6 +155,7 @@ namespace lifx {
 			Payload::LightStatus lightStatus;
 			Payload::LightColorRGBW lightColorRGBW;
 			Payload::LightColorHSL lightColorHSL;
+			Payload::SetDim setDim;
 		};
 
 		uint16_t size;              // LE
@@ -216,6 +224,12 @@ namespace lifx {
 			payload.lightColorHSL = lightColor;
 		}
 
+		void SetDim(const Payload::SetDim& setDim) {
+			Initialize(PacketType::SetDim);
+			size += sizeof(Payload::SetDim);
+			payload.setDim = setDim;
+		}
+
 		std::string ToString() const {
 			std::stringstream ret;
 			ret << "size: " << size;
@@ -251,6 +265,8 @@ namespace lifx {
 				ret << " (SetLightColorHSL)";
 			} else if (packet_type == PacketType::GetLightState) {
 				ret << " (GetLightState)";
+			} else if (packet_type == PacketType::SetDim) {
+				ret << " (SetDim)";
 			} else {
 				ret << " (unknown)";
 			}

@@ -16,6 +16,7 @@ using namespace lifx;
 class Manager {
 public:
 	Manager(const std::string& broadcastIP ){
+		brightness = 0;
 		socket = std::shared_ptr<Socket>(Socket::CreateBroadcast(broadcastIP));
 	}
 
@@ -25,9 +26,14 @@ public:
 		ListDevices();
 	}
 
+	void SetDefaultColor(Color::rgb& rgb, float brightness) {
+		color = rgb;
+		this->brightness = brightness;
+	}
+
 	void Update() {
 		ReadPacket();
-		if (lastStatusCheck + 1000 < socket->GetTicks()) {
+		if (lastStatusCheck + 10000 < socket->GetTicks()) {
 			lastStatusCheck = socket->GetTicks();
 			GetLightState();
 		}
@@ -55,13 +61,37 @@ public:
 		}
 	}
 
+	void Broadcast(Packet& packet) {
+		packet.SetSiteMac(MacAddress());
+		socket->Send(packet);
+	}
+
 	void GetLightState() {
 		Packet newPacket;
 		newPacket.Initialize(PacketType::GetLightState);
 		SendToAll(newPacket);
 	}
 
-	void SetColor(float r, float g, float b) {
+#if 0
+	void SetDim(float dim) {
+		Payload::SetDim setDim;
+		setDim.duration = 1;
+		setDim.brightness = dim * 0xff;
+		Packet p;
+		p.SetDim(setDim);
+		SendToAll(p);
+	}
+#endif
+
+	void SetColor(float r, float g, float b, float brightness) {
+		Color::rgb rgb;
+		rgb.r = r;
+		rgb.g = g;
+		rgb.b = b;
+		SetColor(rgb, brightness);
+	}
+
+	void SetColor(const Color::rgb& rgb, float brightness) {
 		Packet packet;
 #if 0
 		Payload::LightColorRGBW lc;
@@ -73,20 +103,20 @@ public:
 #else
 		Payload::LightColorHSL lc;
 		lc.Initialize();
-		Color::rgb rgb;
-		rgb.r = r;
-		rgb.g = g;
-		rgb.b = b;
 		Color::hsv hsv = Color::rgb2hsv(rgb);
 		lc.hue = (uint8_t)( hsv.h / 360.f * 0xff);
 		lc.saturation = (uint8_t)(hsv.s * 0xff);
-		lc.brightness = (uint8_t) (hsv.v * 0xff);
+		//lc.brightness = (uint8_t) (hsv.v * 0xff);
+		lc.brightness = (uint8_t) (brightness * 0xff);
 		packet.SetLightColorHSL(lc);
 #endif
 		SendToAll(packet);
 	}
 
 protected:
+	Color::rgb color;
+	float brightness;
+
 	void ReadPacket() {
 		Packet packet;
 		if (socket->Receive(packet)) {
@@ -116,8 +146,14 @@ protected:
 			}
 		} else if (packet.GetType() == PacketType::BulbLabel) {
 			bulbs[packet.GetBulbLabel().label] = packet.GetSiteMac();
+			if (brightness > 0) {
+				SetColor(color, brightness);
+			}
 		} else if (packet.GetType() == PacketType::LightStatus) {
 			bulbs[packet.GetLightStatus().bulb_label] = packet.GetSiteMac();
+			if (brightness > 0) {
+				SetColor(color, brightness);
+			}
 		}
 	}
 
@@ -129,6 +165,7 @@ protected:
 int _tmain(int argc, _TCHAR* argv[])
 {
 	Manager manager("192.168.66.255");
+	manager.SetDefaultColor(Color::rgb(1,0,0), 0.2f);
 	manager.Initialize();
 
 	while (true)

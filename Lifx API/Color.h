@@ -7,6 +7,18 @@ namespace lifx {
 	namespace Color {
 
 		struct rgb {
+			rgb() {
+				r = 0;
+				g = 0;
+				b = 0;
+			}
+
+			rgb(float r, float g, float b) {
+				this->r = r;
+				this->g = g;
+				this->b = b;
+			}
+
 			float r;  
 			float g;  
 			float b;  
