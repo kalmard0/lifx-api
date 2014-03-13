@@ -20,6 +20,17 @@ namespace lifx {
 			uint8_t service;
 			uint32_t port;     // LE
 		};
+
+		struct WifiInfo {
+			float signal;   // LE
+			int tx;         // LE
+			int rx;         // LE
+			short mcu_temperature;
+		};
+
+		struct BulbLabel {
+			char label[32]; // UTF-8 encoded string
+		};
 	}
 
 	namespace Protocol {
@@ -31,6 +42,9 @@ namespace lifx {
 		const uint16_t GetPanGateway = 0x02;
 		const uint16_t PanGatewayState = 0x03;
 		const uint16_t GetWifiInfo = 0x10;
+		const uint16_t WifiInfo = 0x11;
+		const uint16_t GetBulbLabel = 0x17;
+		const uint16_t BulbLabel = 0x19;
 	}
 
 	struct MacAddress {
@@ -40,6 +54,15 @@ namespace lifx {
 			for (unsigned i = 0; i <6; ++i) {
 				address[i] = 0;
 			}
+		}
+
+		bool operator==(const MacAddress& other) const {
+			for (unsigned i = 0; i <6; ++i) {
+				if (address[i] != other.address[i]) {
+					return false;
+				}
+			}
+			return true;
 		}
 
 		bool IsNull() const {
@@ -70,6 +93,8 @@ namespace lifx {
 	{
 		union payload_t {
 			Payload::PanGatewayState panGatewayState;
+			Payload::WifiInfo wifiInfo;
+			Payload::BulbLabel bulbLabel;
 		};
 
 		uint16_t size;              // LE
@@ -119,6 +144,11 @@ namespace lifx {
 			return payload.panGatewayState;
 		}
 
+		Payload::BulbLabel GetBulbLabel() const {
+			assert(GetType() == PacketType::BulbLabel);
+			return payload.bulbLabel;
+		}
+
 		std::string ToString() const {
 			std::stringstream ret;
 			ret << "size: " << size;
@@ -133,6 +163,12 @@ namespace lifx {
 				ret << ", port: " <<  payload.panGatewayState.port;
 			} else if (packet_type == PacketType::GetWifiInfo) {
 				ret << " (GetWifiInfo)";
+			} else if (packet_type == PacketType::WifiInfo) {
+				ret << " (WifiInfo), signal: " << payload.wifiInfo.signal;
+			} else if (packet_type == PacketType::GetBulbLabel) {
+				ret << " (GetBulbLabel)";
+			} else if (packet_type == PacketType::BulbLabel) {
+				ret << " (BulbLabel), label: " << payload.bulbLabel.label;
 			} else {
 				ret << " (unknown)";
 			}
@@ -158,6 +194,10 @@ namespace lifx {
 
 		MacAddress GetSiteMac() const {
 			return site;
+		}
+
+		void SetSiteMac(const MacAddress& address) {
+			site = address;
 		}
 	};
 

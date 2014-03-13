@@ -13,5 +13,6 @@ namespace lifx {
 
 		virtual void Send(const Packet& packet) = 0;
 		virtual bool Receive(Packet& packet) = 0;
+		virtual unsigned GetTicks() const = 0;
 	};
 }

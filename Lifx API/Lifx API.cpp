@@ -6,43 +6,75 @@
 #include <sstream>
 #include <memory>
 #include <list>
+#include <map>
 #include "Socket.h"
 #include "Packet.h"
 
 using namespace lifx;
 
-int _tmain(int argc, _TCHAR* argv[])
-{
-	std::shared_ptr<Socket> broadcastSocket( Socket::CreateBroadcast("192.168.66.255"));
-	Packet packet;
-	packet.Initialize(PacketType::GetPanGateway);
-	broadcastSocket->Send(packet);
+class Manager {
+public:
+	Manager(const std::string& broadcastIP ){
+		socket = std::shared_ptr<Socket>(Socket::CreateBroadcast(broadcastIP));
+	}
 
-	std::shared_ptr<Socket> tcpSocket;
+	void Initialize() {
+		bulbs.clear();
+		Packet packet;
+		packet.Initialize(PacketType::GetPanGateway);
+		socket->Send(packet);
+	}
 
-	while (!tcpSocket.get())
-	{
-		if (broadcastSocket->Receive(packet)) {
-			std::cout << "udp: ";
+	void Update() {
+		ReadPacket();
+	}
+
+protected:
+	void ReadPacket() {
+		Packet packet;
+		if (socket->Receive(packet)) {
 			std::cout << packet.ToString() << "\n";
-			if (packet.GetType() == PacketType::PanGatewayState) {
-				Payload::PanGatewayState state = packet.GetPanGatewayState();
-				if (state.service == (int) Payload::PanGatewayState::Service::TCP) {
-					
-					tcpSocket = std::shared_ptr<Socket>(Socket::CreateStream("192.168.66.41"));
-				}
-			}
+			HandleNewPacket(packet);
 		}
 	}
 
-	packet.Initialize(PacketType::GetWifiInfo);
-	tcpSocket->Send(packet);
+	void HandleNewPacket(const Packet& packet) {
+		if (packet.GetType() == PacketType::PanGatewayState) {
+			Payload::PanGatewayState state = packet.GetPanGatewayState();
+			if (state.service == (int) Payload::PanGatewayState::Service::UDP) {
+				MacAddress siteMac = packet.GetSiteMac();
+				bool hasName = false;
+				for (const auto& it : bulbs) {
+					if (it.second == siteMac) {
+						hasName = true;
+						break;
+					}
+				}
 
-	while (true) {
-		if (tcpSocket->Receive(packet)) {
-			std::cout << "tcp: ";
-			std::cout << packet.ToString() << "\n";
+				if (!hasName) {
+					Packet newPacket;
+					newPacket.Initialize(PacketType::GetBulbLabel);
+					newPacket.SetSiteMac(siteMac);
+					socket->Send(newPacket);
+				}
+			}
+		} else if (packet.GetType() == PacketType::BulbLabel) {
+			bulbs[packet.GetBulbLabel().label] = packet.GetSiteMac();
 		}
+	}
+
+	std::shared_ptr<Socket> socket;
+	std::map<std::string, MacAddress> bulbs;
+};
+
+int _tmain(int argc, _TCHAR* argv[])
+{
+	Manager manager("192.168.66.41");
+	manager.Initialize();
+
+	while (true)
+	{
+		manager.Update();
 	}
 
 	return 0;

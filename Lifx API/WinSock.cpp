@@ -44,9 +44,21 @@ namespace lifx {
 		}
 
 		bool Receive(Packet& packet) {
+			unsigned long nBytesAvailable;
+			if ( ioctlsocket(socket_, FIONREAD, &nBytesAvailable) != SOCKET_ERROR )
+			{
+				if (nBytesAvailable == 0) {
+					return false;
+				}
+			}
+
 			int fromLen = sizeof(from);
 			int recvd = recvfrom(socket_,(char*) &packet, sizeof(packet), 0, (SOCKADDR*) &from, &fromLen);
 			return true;
+		}
+
+		unsigned GetTicks() const {
+			return GetTickCount();
 		}
 
 	protected:
