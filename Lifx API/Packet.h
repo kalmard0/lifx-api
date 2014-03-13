@@ -7,6 +7,8 @@
 
 namespace lifx {
 
+	// from the awesome https://github.com/magicmonkey/lifxjs/blob/master/Protocol.md
+
 #pragma pack(push, 1) 
 
 	namespace Payload {
