@@ -3,6 +3,7 @@
 #include <sstream>
 #include <cstdint>
 #include <iomanip>
+#include <cassert>
 
 namespace lifx {
 
@@ -85,27 +86,37 @@ namespace lifx {
 
 	public:
 		Packet() {
-			size = 0;
-			protocol = Protocol::Send;
 			reserved1  = 0;
 			reserved2 = 0;
 			reserved3 = 0;
 			timestamp = 0;
 			reserved4 = 0;
 
-			SetType(PacketType::Invalid);
+			Initialize(PacketType::Invalid);
 		}
 
 		uint16_t GetSize() const {
 			return size;
 		}
 
-		void SetType(uint16_t type) {
+		void Initialize(uint16_t type) {
 			packet_type = type;
+			protocol = Protocol::Send;
+			target_mac_address = MacAddress();
+			site = MacAddress();
 			size = sizeof(Packet) - sizeof(payload_t);
 			if (type == PacketType::PanGatewayState) {
 				size += sizeof(Payload::PanGatewayState);
 			}
+		}
+
+		uint16_t GetType() const {
+			return packet_type;
+		}
+
+		Payload::PanGatewayState GetPanGatewayState() const {
+			assert (GetType() == PacketType::PanGatewayState) ;
+			return payload.panGatewayState;
 		}
 
 		std::string ToString() const {
@@ -120,6 +131,8 @@ namespace lifx {
 				ret << " (PanGatewayState)";
 				ret << ", service: " << (int) payload.panGatewayState.service;
 				ret << ", port: " <<  payload.panGatewayState.port;
+			} else if (packet_type == PacketType::GetWifiInfo) {
+				ret << " (GetWifiInfo)";
 			} else {
 				ret << " (unknown)";
 			}
@@ -137,6 +150,10 @@ namespace lifx {
 
 		MacAddress GetTargetMac() const {
 			return target_mac_address;
+		}
+
+		void SetTargetMac(const MacAddress& address) {
+			target_mac_address = address;
 		}
 
 		MacAddress GetSiteMac() const {
