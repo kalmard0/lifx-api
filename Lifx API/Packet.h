@@ -43,13 +43,23 @@ namespace lifx {
 			uint64_t tags;
 		};
 
-		struct LightColor {
+		struct LightColorRGBW {
 			void Initialize() {
 				memset(this, 0, sizeof(*this));
 			}
-#if 0
+			uint16_t blue;
+			uint16_t green;
+			uint16_t red;
+			uint16_t white;
+		};
+
+		struct LightColorHSL {
+			void Initialize() {
+				memset(this, 0, sizeof(*this));
+			}
 			uint8_t stream;        // Unknown, potential "streaming" mode toggle? Set to
 			// 0x00 for now.
+#if 1
 			uint8_t reserved1;
 			uint8_t hue;         // LE NOTE: Wraps around at 0xff 0xff back to 0x00 0x00
 			// which is a primary red colour.
@@ -59,13 +69,13 @@ namespace lifx {
 			uint8_t brightness;  // LE
 			uint8_t reserved4;
 			uint8_t kelvin;      // LE i.e. colour temperature (whites wheel in apps)
-			uint32_t fade_time;   // LE Length of fade action, in seconds
 #else
-			uint16_t blue;
-			uint16_t green;
-			uint16_t red;
-			uint16_t white;
+			uint16_t hue;
+			uint16_t saturation;
+			uint16_t brightness;
+			uint16_t kelvin; 
 #endif
+			uint32_t fade_time;   // LE Length of fade action, in seconds
 		};
 	}
 
@@ -82,7 +92,8 @@ namespace lifx {
 		const uint16_t GetBulbLabel = 0x17;
 		const uint16_t BulbLabel = 0x19;
 		const uint16_t GetLightState = 0x65;
-		const uint16_t SetLightColor = 0x6a;
+		const uint16_t SetLightColorHSL = 0x66;
+		const uint16_t SetLightColorRGBW = 0x6a;
 		const uint16_t LightStatus = 0x6b;
 	}
 
@@ -135,7 +146,8 @@ namespace lifx {
 			Payload::WifiInfo wifiInfo;
 			Payload::BulbLabel bulbLabel;
 			Payload::LightStatus lightStatus;
-			Payload::LightColor lightColor;
+			Payload::LightColorRGBW lightColorRGBW;
+			Payload::LightColorHSL lightColorHSL;
 		};
 
 		uint16_t size;              // LE
@@ -192,10 +204,16 @@ namespace lifx {
 			return payload.lightStatus;
 		}
 
-		void SetLightColor(const Payload::LightColor& lightColor) {
-			Initialize(PacketType::SetLightColor);
-			size += sizeof(Payload::LightColor);
-			payload.lightColor = lightColor;
+		void SetLightColorRGBW(const Payload::LightColorRGBW& lightColor) {
+			Initialize(PacketType::SetLightColorRGBW);
+			size += sizeof(Payload::LightColorRGBW);
+			payload.lightColorRGBW = lightColor;
+		}
+
+		void SetLightColorHSL(const Payload::LightColorHSL& lightColor) {
+			Initialize(PacketType::SetLightColorHSL);
+			size += sizeof(Payload::LightColorHSL);
+			payload.lightColorHSL = lightColor;
 		}
 
 		std::string ToString() const {
@@ -227,10 +245,12 @@ namespace lifx {
 				ret << ", kelvin: 0x" << payload.lightStatus.kelvin;
 				ret << ", dim: 0x" << payload.lightStatus.dim;
 				ret << ", power: 0x" << payload.lightStatus.power;
-			} else if (packet_type == PacketType::SetLightColor) {
-				ret << " (SetLightColor)";
+			} else if (packet_type == PacketType::SetLightColorRGBW) {
+				ret << " (SetLightColorRGBW)";
+			} else if (packet_type == PacketType::SetLightColorHSL) {
+				ret << " (SetLightColorHSL)";
 			} else if (packet_type == PacketType::GetLightState) {
-				ret << " (getLightState)";
+				ret << " (GetLightState)";
 			} else {
 				ret << " (unknown)";
 			}

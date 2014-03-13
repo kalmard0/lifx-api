@@ -4,190 +4,114 @@
 // These functions taken from http://codesuppository.blogspot.hu/2012/06/hsl2rgb-convert-rgb-colors-to-hsl-or.html
 
 namespace lifx {
-	class Color {
-	public:
-		struct RGBFloats {
-			float r,g,b;
-		};
+	namespace Color {
 
-		struct RGBBytes {
-			uint8_t r,g,b;
-		};
+		struct rgb {
+			float r;  
+			float g;  
+			float b;  
+		} ;
 
-		struct HSLBytes {
-			uint8_t h,s,l;
-		};
+		struct hsv {
+			float h;       // angle in degrees
+			float s;       // percent
+			float v;       // percent
+		} ;
 
-		Color(const RGBBytes& bytes) {
-			color = bytes;
-		}
-
-		Color(const RGBFloats& floats) {
-			color.r = (uint8_t) (floats.r * 255);
-			color.g =(uint8_t)( floats.g * 255);
-			color.b = (uint8_t)(floats.b * 255);
-		}
-
-		Color(const HSLBytes& hsl) {
-			unsigned int r = 0;
-			unsigned int g = 0;
-			unsigned int b = 0;
-
-			float L = ((float)hsl.l)/255;
-			float S = ((float)hsl.s)/255;
-			float H = ((float)hsl.h)/255;
-
-			if(hsl.s == 0)
-			{
-				color.r = hsl.l;
-				color.g = hsl.l;
-				color.b = hsl.l;
-			}
-			else
-			{
-				float temp1 = 0;
-				if(L < .50)
-				{
-					temp1 = L*(1 + S);
-				}
-				else
-				{
-					temp1 = L + S - (L*S);
-				}
-
-				float temp2 = 2*L - temp1;
-
-				float temp3 = 0;
-				for(int i = 0 ; i < 3 ; i++)
-				{
-					switch(i)
-					{
-					case 0: // red
-						{
-							temp3 = H + .33333f;
-							if(temp3 > 1)
-								temp3 -= 1;
-							HSLtoRGB_Subfunction(r,temp1,temp2,temp3);
-							break;
-						}
-					case 1: // green
-						{
-							temp3 = H;
-							HSLtoRGB_Subfunction(g,temp1,temp2,temp3);
-							break;
-						}
-					case 2: // blue
-						{
-							temp3 = H - .33333f;
-							if(temp3 < 0)
-								temp3 += 1;
-							HSLtoRGB_Subfunction(b,temp1,temp2,temp3);
-							break;
-						}
-					default:
-						{
-
-						}
-					}
-				}
-				color.r = (uint8_t)((((float)r)/100)*255);
-				color.g = (uint8_t)((((float)g)/100)*255);
-				color.b = (uint8_t)((((float)b)/100)*255);
-			}
-		}
-		HSLBytes GetAsHSL() const
+		hsv rgb2hsv(const rgb& in)
 		{
-			unsigned int r = color.r;
-			unsigned int g = color.g;
-			unsigned int b = color.b;
+			hsv         out;
+			float      min, max, delta;
 
-			float r_percent = ((float)r)/255;
-			float g_percent = ((float)g)/255;
-			float b_percent = ((float)b)/255;
+			min = in.r < in.g ? in.r : in.g;
+			min = min  < in.b ? min  : in.b;
 
-			float max_color = 0;
-			if((r_percent >= g_percent) && (r_percent >= b_percent))
-			{
-				max_color = r_percent;
+			max = in.r > in.g ? in.r : in.g;
+			max = max  > in.b ? max  : in.b;
+
+			out.v = max;                                // v
+			delta = max - min;
+			if( max > 0.0 ) {
+				out.s = (delta / max);                  // s
+			} else {
+				// r = g = b = 0                        // s = 0, v is undefined
+				out.s = 0.0;
+				out.h = std::numeric_limits<float>::quiet_NaN();                            // its now undefined
+				return out;
 			}
-			if((g_percent >= r_percent) && (g_percent >= b_percent))
-				max_color = g_percent;
-			if((b_percent >= r_percent) && (b_percent >= g_percent))
-				max_color = b_percent;
-
-			float min_color = 0;
-			if((r_percent <= g_percent) && (r_percent <= b_percent))
-				min_color = r_percent;
-			if((g_percent <= r_percent) && (g_percent <= b_percent))
-				min_color = g_percent;
-			if((b_percent <= r_percent) && (b_percent <= g_percent))
-				min_color = b_percent;
-
-			float L = 0;
-			float S = 0;
-			float H = 0;
-
-			L = (max_color + min_color)/2;
-
-			if(max_color == min_color)
-			{
-				S = 0;
-				H = 0;
-			}
+			if( in.r >= max )                           // > is bogus, just keeps compilor happy
+				out.h = ( in.g - in.b ) / delta;        // between yellow & magenta
 			else
-			{
-				if(L < .50)
-				{
-					S = (max_color - min_color)/(max_color + min_color);
-				}
+				if( in.g >= max )
+					out.h = 2.0f + ( in.b - in.r ) / delta;  // between cyan & yellow
 				else
-				{
-					S = (max_color - min_color)/(2 - max_color - min_color);
-				}
-				if(max_color == r_percent)
-				{
-					H = (g_percent - b_percent)/(max_color - min_color);
-				}
-				if(max_color == g_percent)
-				{
-					H = 2 + (b_percent - r_percent)/(max_color - min_color);
-				}
-				if(max_color == b_percent)
-				{
-					H = 4 + (r_percent - g_percent)/(max_color - min_color);
-				}
-			}
+					out.h = 4.0f + ( in.r - in.g ) / delta;  // between magenta & cyan
 
-			HSLBytes ret;
-			ret.h = (uint8_t) (H * 255);
-			ret.l = (uint8_t)( L *255);
-			ret.s = (uint8_t) (S*255);
-			return ret;
+			out.h *= 60.0f;                              // degrees
+
+			if( out.h < 0.0f )
+				out.h += 360.0f;
+
+			return out;
 		}
 
 
-		RGBFloats GetAsFloats() const {
-			RGBFloats ret;
-			ret.r = color.r / 255.f;
-			ret.g = color.g / 255.f;
-			ret.b = color.b / 255.f;
-		}
-
-	protected:
-		RGBBytes color;
-		static void HSLtoRGB_Subfunction(unsigned int& c, const float& temp1, const float& temp2, const float& temp3)
+		rgb hsv2rgb(const hsv& in)
 		{
-			if((temp3 * 6) < 1)
-				c = (unsigned int)((temp2 + (temp1 - temp2)*6*temp3)*100);
-			else
-				if((temp3 * 2) < 1)
-					c = (unsigned int)(temp1*100);
-				else
-					if((temp3 * 3) < 2)
-						c = (unsigned int)((temp2 + (temp1 - temp2)*(.66666 - temp3)*6)*100);
-					else
-						c = (unsigned int)(temp2*100);
-			return;
+			float      hh, p, q, t, ff;
+			long        i;
+			rgb         out;
+
+			if(in.s <= 0.0) {       // < is bogus, just shuts up warnings
+				out.r = in.v;
+				out.g = in.v;
+				out.b = in.v;
+				return out;
+			}
+			hh = in.h;
+			if(hh >= 360.0) hh = 0.0;
+			hh /= 60.0;
+			i = (long)hh;
+			ff = hh - i;
+			p = in.v * (1.0f - in.s);
+			q = in.v * (1.0f - (in.s * ff));
+			t = in.v * (1.0f - (in.s * (1.0f - ff)));
+
+			switch(i) {
+			case 0:
+				out.r = in.v;
+				out.g = t;
+				out.b = p;
+				break;
+			case 1:
+				out.r = q;
+				out.g = in.v;
+				out.b = p;
+				break;
+			case 2:
+				out.r = p;
+				out.g = in.v;
+				out.b = t;
+				break;
+
+			case 3:
+				out.r = p;
+				out.g = q;
+				out.b = in.v;
+				break;
+			case 4:
+				out.r = t;
+				out.g = p;
+				out.b = in.v;
+				break;
+			case 5:
+			default:
+				out.r = in.v;
+				out.g = p;
+				out.b = q;
+				break;
+			}
+			return out;     
 		}
-	};
+	}
 }

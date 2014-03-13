@@ -21,23 +21,69 @@ public:
 
 	void Initialize() {
 		bulbs.clear();
-		Packet packet;
-		packet.Initialize(PacketType::GetPanGateway);
-		socket->Send(packet);
 		lastStatusCheck = socket->GetTicks();
+		ListDevices();
 	}
 
 	void Update() {
 		ReadPacket();
-		if (lastStatusCheck + 10000 < socket->GetTicks()) {
+		if (lastStatusCheck + 1000 < socket->GetTicks()) {
 			lastStatusCheck = socket->GetTicks();
-			Packet packet;
-			packet.Initialize(PacketType::GetLightState);
-			for (const auto& it: bulbs) {
-				packet.SetSiteMac(it.second);
-				socket->Send(packet);
-			}
+			GetLightState();
 		}
+	}
+
+	void ListDevices() {
+		Packet packet;
+		packet.Initialize(PacketType::GetPanGateway);
+		socket->Send(packet);
+	}
+
+	void SendTo(Packet& packet, const std::string& name) {
+		packet.SetSiteMac(bulbs[name]);
+		socket->Send(packet);
+	}
+
+	void SendTo(Packet& packet, const MacAddress& mac){
+		packet.SetSiteMac(mac);
+		socket->Send(packet);
+	}
+
+	void SendToAll(Packet& packet) {
+		for (const auto& it : bulbs) {
+			SendTo(packet, it.first);
+		}
+	}
+
+	void GetLightState() {
+		Packet newPacket;
+		newPacket.Initialize(PacketType::GetLightState);
+		SendToAll(newPacket);
+	}
+
+	void SetColor(float r, float g, float b) {
+		Packet packet;
+#if 0
+		Payload::LightColorRGBW lc;
+		lc.Initialize();
+		lc.blue = (uint16_t) (b * 0xff);
+		lc.red = (uint16_t) (r * 0xff);
+		lc.green = (uint16_t) (g * 0xff);
+		packet.SetLightColorRGBW(lc);
+#else
+		Payload::LightColorHSL lc;
+		lc.Initialize();
+		Color::rgb rgb;
+		rgb.r = r;
+		rgb.g = g;
+		rgb.b = b;
+		Color::hsv hsv = Color::rgb2hsv(rgb);
+		lc.hue = (uint8_t)( hsv.h / 360.f * 0xff);
+		lc.saturation = (uint8_t)(hsv.s * 0xff);
+		lc.brightness = (uint8_t) (hsv.v * 0xff);
+		packet.SetLightColorHSL(lc);
+#endif
+		SendToAll(packet);
 	}
 
 protected:
@@ -63,42 +109,9 @@ protected:
 				}
 
 				if (!hasName) {
-					Packet newPacket;
-					newPacket.Initialize(PacketType::GetLightState);
-					newPacket.SetSiteMac(siteMac);
-					socket->Send(newPacket);
-
-					Payload::LightColor lc;
-					lc.Initialize();
-					
-#if 0
-					lc.stream = 0;
-					lc.hue = 0xaa;
-					lc.brightness = 0xff;
-					lc.saturation = 0xff;
-
-					Color::RGBFloats floats;
-					floats.r = 0;
-					floats.g = 1;
-					floats.b = 0;
-					Color c(floats);
-
-					Color::HSLBytes hsl = c.GetAsHSL();
-					lc.hue = hsl.h;
-					lc.brightness = hsl.l;
-					lc.saturation = hsl.s;
-					lc.fade_time = 0;
-					lc.kelvin = 0;
-#else
-					lc.blue = 0xff;
-					lc.green = 0xff;
-					lc.red = 0xff;
-					lc.white = 0xff;
-#endif			
-					newPacket.SetLightColor(lc);
-					newPacket.SetTargetMac(siteMac);
-					newPacket.SetSiteMac(siteMac);
-					socket->Send(newPacket);
+					Packet p;
+					p.Initialize(PacketType::GetBulbLabel);
+					SendTo(p, siteMac);
 				}
 			}
 		} else if (packet.GetType() == PacketType::BulbLabel) {
