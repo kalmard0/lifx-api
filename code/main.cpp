@@ -206,7 +206,7 @@ protected:
 };
 
 int main(int argc, const char* argv[]) {
-    Manager manager("255.255.255.255");
+    Manager manager("192.168.66.255");
     manager.Initialize();
     manager.ReadBulbs("cache");
 

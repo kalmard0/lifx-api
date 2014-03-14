@@ -6,6 +6,8 @@
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <netinet/in.h>
+#include <arpa/inet.h>
+
 #include <netdb.h>
 
 #include "Socket.h"
@@ -19,42 +21,47 @@ public:
             assert(!"tcp unsupported");
         }
 
-        struct sockaddr_in write_addr;
-        struct sockaddr_in read_addr;
-        struct hostent *server;
+        int ret;
 
-        write_sock = socket(AF_INET, SOCK_DGRAM, 0);
+        write_sock = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
         assert(write_sock >= 0);
-        server = gethostbyname(ip.c_str());
-        assert(server != NULL);
         memset(&write_addr, 0, sizeof(write_addr));
         write_addr.sin_family = AF_INET;
-        memcpy(server->h_addr, &write_addr.sin_addr.s_addr, server->h_length);
+        inet_aton(ip.c_str(), &write_addr.sin_addr);
         write_addr.sin_port = htons(port);
-        int ret = connect(write_sock, (struct sockaddr *) &write_addr,
-                sizeof(write_addr));
+        int broadcastEnable = 1;
+        ret = setsockopt(write_sock, SOL_SOCKET, SO_BROADCAST, &broadcastEnable,
+                sizeof(broadcastEnable));
         assert(ret >= 0);
 
-        read_sock = socket(AF_INET, SOCK_DGRAM, 0);
-        server = gethostbyname("0.0.0.0");
-        assert(server != NULL);
+        read_sock = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
+        assert(read_sock >= 0);
         memset(&read_addr, 0, sizeof(read_addr));
+        inet_aton("0.0.0.0", &read_addr.sin_addr);
         read_addr.sin_family = AF_INET;
-        memcpy(server->h_addr, &read_addr.sin_addr.s_addr, server->h_length);
         read_addr.sin_port = htons(port);
-        ret = connect(read_sock, (struct sockaddr *) &read_addr,
-                sizeof(read_addr));
+        broadcastEnable = 1;
+        ret = setsockopt(read_sock, SOL_SOCKET, SO_BROADCAST, &broadcastEnable,
+                sizeof(broadcastEnable));
+        assert(ret >= 0);
+        ret = bind(read_sock, (sockaddr *) &read_addr, sizeof(read_addr));
         assert(ret >= 0);
     }
 
     void Send(const Packet& packet) {
-        int written = write(write_sock, (const void*) &packet,
-                packet.GetSize());
-        assert(written == packet.GetSize());
+        int written = sendto(write_sock, (const void*) &packet,
+                packet.GetSize(), 0, (struct sockaddr *) &write_addr,
+                sizeof(write_addr));
+        if (written < 0) {
+            perror("sendto");
+            exit(1);
+        }
     }
 
     bool Receive(Packet& packet) {
-        int r = read(read_sock, (void*) &packet, sizeof(packet));
+        unsigned size = sizeof(read_addr);
+        int r = recvfrom(read_sock, (void*) &packet, sizeof(packet), 0,
+                (struct sockaddr*) &read_addr, &size);
         assert(r > 0);
         return true;
     }
@@ -65,6 +72,8 @@ public:
 
 protected:
     int write_sock, read_sock;
+    struct sockaddr_in write_addr;
+    struct sockaddr_in read_addr;
 };
 
 Socket* Socket::CreateBroadcast(const std::string& broadcastIP, uint16_t port) {
