@@ -4,6 +4,8 @@
 #include <cstdint>
 #include <iomanip>
 #include <cassert>
+#include <cstring>
+#include <string.h>
 
 namespace lifx {
 

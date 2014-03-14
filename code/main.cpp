@@ -65,6 +65,10 @@ public:
         this->brightness = brightness;
     }
 
+    void MainLoop() {
+        while (Update());
+    }
+
     bool Update() {
         ReadPacket();
         if (timeout > 0 && startTime + timeout < socket->GetTicks()) {
@@ -202,7 +206,7 @@ protected:
 };
 
 int main(int argc, const char* argv[]) {
-    Manager manager("192.168.66.255");
+    Manager manager("255.255.255.255");
     manager.Initialize();
     manager.ReadBulbs("cache");
 
@@ -217,10 +221,7 @@ int main(int argc, const char* argv[]) {
 
         std::cout << r << " " << g << " " << b << " " << brightness << "\n";
     } else {
-        // try to update cache
-        manager.SetTimeout(2000);
-        while (manager.Update())
-            ;
+        manager.MainLoop();
     }
 
     return 0;
