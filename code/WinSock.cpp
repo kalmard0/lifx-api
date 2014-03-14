@@ -1,3 +1,5 @@
+#ifdef WIN32
+
 #include "Socket.h"
 #include <iostream>
 #include <cassert>
@@ -75,3 +77,5 @@ namespace lifx {
 		return new Winsock(ip, port, false);
 	}
 }
+
+#endif
