@@ -142,6 +142,7 @@ public:
 		lc.saturation = (uint8_t)(hsv.s * 0xff);
 		//lc.brightness = (uint8_t) (hsv.v * 0xff);
 		lc.brightness = (uint8_t) (brightness * 0xff);
+		lc.fade_time = 1;
 		packet.SetLightColorHSL(lc);
 #endif
 		SendToAll(packet);

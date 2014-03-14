@@ -71,13 +71,15 @@ namespace lifx {
 			uint8_t brightness;  // LE
 			uint8_t reserved4;
 			uint8_t kelvin;      // LE i.e. colour temperature (whites wheel in apps)
+			uint16_t reserved5;
+			uint16_t fade_time;
 #else
 			uint16_t hue;
 			uint16_t saturation;
 			uint16_t brightness;
 			uint16_t kelvin; 
-#endif
 			uint32_t fade_time;   // LE Length of fade action, in seconds
+#endif	
 		};
 
 		struct SetDim {
