@@ -5,12 +5,12 @@ OBJECTS=$(SOURCES:.cpp=.o)
 EXECUTABLE=lifx-api
 
 all: $(SOURCES) $(EXECUTABLE)
-	
-$(EXECUTABLE): $(OBJECTS) 
+
+$(EXECUTABLE): $(OBJECTS)
 	$(CXX) $(LDFLAGS) $(OBJECTS) -o $@
 
 .cpp.o:
 	$(CXX) $(CFLAGS) $< -o $@
 
 clean:
-	rm -f $(OBJECTS) $(EXECUTABLE) 
+	rm -f $(OBJECTS) $(EXECUTABLE)
